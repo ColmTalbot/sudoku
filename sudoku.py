@@ -37,7 +37,8 @@ class Board(np.ndarray):
         return obj
 
     def __array_finalize__(self, obj):
-        if obj is None: return
+        if obj is None:
+            return
         self.nn = getattr(obj, 'nn', 3)
         self.numbers = getattr(obj, 'numbers', np.arange(1, self.nn ** 2 + 1, 1))
 
@@ -120,8 +121,8 @@ class Board(np.ndarray):
                 if len(self.current_allowed[xx][yy]) == 1:
                     self[yy, xx] = int(self.current_allowed[xx][yy])
         self.current_allowed = self.allowed_per_cell()
-        for xx in np.arange(0, 9):
-            for yy in np.arange(0, 9):
+        for xx in self.numbers - 1:
+            for yy in self.numbers - 1:
                 if self[yy, xx] > 0:
                     continue
                 self[yy, xx] = self.required(xx, yy)
@@ -134,11 +135,10 @@ class Board(np.ndarray):
             self.iterate()
             n_remaining_new = self.remaining
             if n_remaining_new == n_remaining_old:
-                print("Solver is stuck!")
-                return
+                return False
             else:
                 n_remaining_old = n_remaining_new
-        return
+        return True
 
     def required(self, xx, yy):
         for _friends in self.friends(xx, yy):
@@ -170,42 +170,62 @@ def draw_game(initial=False):
     screen.fill((245, 245, 220))
     if not initial:
         draw_numbers()
-    for ii in range(1, 9):
-        pygame.draw.line(screen, 1, [0, 90 * ii], [810, 90 * ii])
-        pygame.draw.line(screen, 1, [90 * ii, 0], [90 * ii, 810])
-    for ii in range(1, 3):
-        pygame.draw.line(screen, 1, [0, 270 * ii], [810, 270 * ii], width=5)
-        pygame.draw.line(screen, 1, [270 * ii, 0], [270 * ii, 810], width=5)
+    for ii in range(1, BASE ** 2):
+        pygame.draw.line(screen, 1, [0, SQUARESIZE * ii], [SQUARESIZE * BASE ** 2, SQUARESIZE * ii])
+        pygame.draw.line(screen, 1, [SQUARESIZE * ii, 0], [SQUARESIZE * ii, SQUARESIZE * BASE ** 2])
+    for ii in range(1, BASE):
+        pygame.draw.line(screen, 1, [0, SQUARESIZE * BASE * ii], [SQUARESIZE * BASE ** 2, SQUARESIZE * BASE * ii],
+                         width=5)
+        pygame.draw.line(screen, 1, [SQUARESIZE * BASE * ii, 0], [SQUARESIZE * BASE * ii, SQUARESIZE * BASE ** 2],
+                         width=5)
     pygame.display.update()
 
 
 def draw_numbers():
-    pygame.draw.rect(screen, (255, 255, 128), [x_pos * 90, y_pos * 90, 90, 90])
-    for ii in range(9):
-        for jj in range(9):
+    pygame.draw.rect(
+        screen, (255, 255, 128),
+        [x_pos * SQUARESIZE, y_pos * SQUARESIZE, SQUARESIZE, SQUARESIZE]
+    )
+    for ii in range(BASE ** 2):
+        for jj in range(BASE ** 2):
             if np.all(drawn_board > 0):
                 if drawn_board[ii, jj] == solution[ii, jj]:
-                    pygame.draw.rect(screen, (0, 128, 0), [ii * 90, jj * 90, 90, 90])
+                    pygame.draw.rect(
+                        screen, (0, 128, 0),
+                        [ii * SQUARESIZE, jj * SQUARESIZE, SQUARESIZE, SQUARESIZE]
+                    )
                 else:
-                    pygame.draw.rect(screen, (128, 0, 0), [ii * 90, jj * 90, 90, 90])
+                    pygame.draw.rect(
+                        screen, (128, 0, 0),
+                        [ii * SQUARESIZE, jj * SQUARESIZE, SQUARESIZE, SQUARESIZE]
+                    )
             if drawn_board[ii, jj] > 0:
-                screen.blit(text_surfaces[drawn_board[ii, jj] - 1], (ii * 90 + 30, jj * 90 + 15))
+                screen.blit(
+                    text_surfaces[drawn_board[ii, jj] - 1],
+                    (ii * SQUARESIZE + SQUARESIZE // 3, jj * SQUARESIZE + SQUARESIZE // 6)
+                )
             elif hint_board[ii, jj]:
-                screen.blit(text_surfaces[solution[ii, jj] - 1], (ii * 90 + 30, jj * 90 + 15))
+                screen.blit(
+                    text_surfaces[solution[ii, jj] - 1],
+                    (ii * SQUARESIZE + SQUARESIZE // 3, jj * SQUARESIZE + SQUARESIZE // 6))
             else:
-                for kk in range(9):
+                for kk in range(BASE ** 2):
                     if (drawn_board.allowed[ii, jj, kk] & help_) | allowed_board[ii, jj, kk]:
-                        screen.blit(small_text_surfaces[kk], (ii * 90 + kk * 10 + 2, jj * 90))
+                        screen.blit(
+                            small_text_surfaces[kk],
+                            (ii * SQUARESIZE + kk * SQUARESIZE // (BASE ** 2 + 1) + 2, jj * SQUARESIZE)
+                        )
 
 
-def reset():
-    initial_board, solution = scrape_game()
-    board = Board()
-    for ii in range(9):
-        for jj in range(9):
+def reset(base=3):
+    initial_board, solution = new_board(base=base)
+    board = Board(nn=base)
+    base = base ** 2
+    for ii in range(base):
+        for jj in range(base):
             board[ii, jj] = initial_board[ii, jj]
-    allowed_board = np.zeros((9, 9, 9), dtype=bool)
-    hint_board = np.zeros((9, 9), dtype=bool)
+    allowed_board = np.zeros((base, base, base), dtype=bool)
+    hint_board = np.zeros((base, base), dtype=bool)
     return initial_board, solution, board, allowed_board, hint_board
 
 
@@ -259,20 +279,22 @@ if __name__ == "__main__":
         sys.exit()
 
     pygame.init()
-    screen = pygame.display.set_mode((810, 810))
+    BASE = 3
+    SQUARESIZE = 60
+    screen = pygame.display.set_mode((SQUARESIZE * BASE ** 2, SQUARESIZE * BASE ** 2))
     pygame.display.set_caption("sudoku")
     draw_game(initial=True)
     run = True
     x_pos = 0
     y_pos = 0
-    initial_board, solution, drawn_board, allowed_board, hint_board = reset()
-    font = pygame.font.SysFont('Times New Roman', 60)
-    small_font = pygame.font.SysFont('Times New Roman', 15)
+    initial_board, solution, drawn_board, allowed_board, hint_board = reset(base=BASE)
+    font = pygame.font.SysFont('Times New Roman', SQUARESIZE * 2 // 3)
+    small_font = pygame.font.SysFont('Times New Roman', SQUARESIZE // 4)
     text_surfaces = [
-        font.render(str(ii), True, 1) for ii in range(1, 10)
+        font.render(f"{ii:x}", True, 1) for ii in range(1, BASE ** 2 + 1)
     ]
     small_text_surfaces = [
-        small_font.render(str(ii), True, 1) for ii in range(1, 10)
+        small_font.render(f"{ii:x}", True, 1) for ii in range(1, BASE ** 2 + 1)
     ]
     shift = False
     help_ = False
@@ -301,7 +323,7 @@ if __name__ == "__main__":
                 elif event.key == pygame.K_r:
                     drawn_board[x_pos, y_pos] = solution[x_pos, y_pos]
                 elif event.key == pygame.K_n:
-                    initial_board, solution, drawn_board, allowed_board, hint_board = reset()
+                    initial_board, solution, drawn_board, allowed_board, hint_board = reset(base=BASE)
                 elif event.key == pygame.K_x and shift:
                     pygame.quit()
                 elif event.key == pygame.K_s:
@@ -328,15 +350,15 @@ if __name__ == "__main__":
                     shift = ~shift
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 x, y = event.__dict__["pos"]
-                x_pos = x // 90
-                y_pos = y // 90
+                x_pos = x // SQUARESIZE
+                y_pos = y // SQUARESIZE
                 if event.__dict__["button"] == 3:
                     hint_board[x_pos, y_pos] = True
                 draw_game()
             elif event.type == pygame.MOUSEBUTTONUP:
                 x, y = event.__dict__["pos"]
-                x_pos = x // 90
-                y_pos = y // 90
+                x_pos = x // SQUARESIZE
+                y_pos = y // SQUARESIZE
                 if event.__dict__["button"] == 3:
                     hint_board[x_pos, y_pos] = False
                 draw_game()
