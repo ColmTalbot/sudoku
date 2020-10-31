@@ -14,7 +14,6 @@ Controls:
 """
 
 import sys
-from urllib.request import urlopen
 
 import numpy as np
 import pygame
@@ -167,31 +166,6 @@ class Board(np.ndarray):
         return friends
 
 
-def scrape_game():
-    boards = [np.empty((9, 9), dtype=int), np.empty((9, 9), dtype=int)]
-    idx = np.random.randint(0, 1000000)
-    board_url = f"http://www.menneske.no/sudoku/eng/showpuzzle.html?number={idx}"
-    solution_url = f"http://www.menneske.no/sudoku/eng/solution.html?number={idx}"
-    for ii, url in enumerate([board_url, solution_url]):
-        index = 0
-        board = boards[ii]
-        page = urlopen(url)
-        lines = page.readlines()
-        for line in lines:
-            line = line.decode("utf-8")
-            if "td class" in line:
-                value = ''.join(filter(str.isdigit, line))
-                if not value:
-                    value = 0
-                else:
-                    value = int(value)
-                board[index % 9, index // 9] = value
-                index += 1
-        if not index == 81:
-            raise ValueError(f"Only {index} entries found")
-    return boards
-
-
 def draw_game(initial=False):
     screen.fill((245, 245, 220))
     if not initial:
@@ -233,6 +207,46 @@ def reset():
     allowed_board = np.zeros((9, 9, 9), dtype=bool)
     hint_board = np.zeros((9, 9), dtype=bool)
     return initial_board, solution, board, allowed_board, hint_board
+
+
+def new_board(base=3, empty_fraction=0.75):
+    """
+    Adapted from https://stackoverflow.com/a/56581709
+
+    The algorithm for base is:
+    - start from a base solution
+    - permute the rows and columns inside each sub-grid
+    - permute the row/column ordering of the sub-grids
+    - permute the labels
+    - remove some fraction of the labels
+
+    Parameters
+    ----------
+    base: int
+        The size width/height of a sub-grid.
+        The total width/height=base^2.
+    empty_fraction: float
+        The fraction of squares to leave empty at the beginning.
+    """
+    side = base * base
+
+    def pattern(row, column):
+        return int(base * (row % base) + row // base + column) % side
+
+    rows = [grid * base + row for grid in np.random.permutation(base) for row in np.random.permutation(base)]
+    cols = [grid * base + column for grid in np.random.permutation(base) for column in np.random.permutation(base)]
+    # numbers = np.arange(side) + 1
+    numbers = np.random.permutation(side) + 1
+
+    solution = np.array([[numbers[pattern(r, c)] for c in cols] for r in rows], dtype=int)
+    board = solution.copy()
+
+    number_of_squares = side * side
+    number_empty = int(number_of_squares * empty_fraction)
+    for index in np.random.choice(number_of_squares, number_empty):
+        board[index // side, index % side] = 0
+
+    return board, solution
 
 
 if __name__ == "__main__":
