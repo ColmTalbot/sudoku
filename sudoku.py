@@ -206,9 +206,14 @@ def draw_game(initial=False):
 
 
 def draw_numbers():
-    pygame.draw.rect(screen, (128, 0, 0), [x_pos * 90, y_pos * 90, 90, 90])
+    pygame.draw.rect(screen, (255, 255, 128), [x_pos * 90, y_pos * 90, 90, 90])
     for ii in range(9):
         for jj in range(9):
+            if np.all(drawn_board > 0):
+                if drawn_board[ii, jj] == solution[ii, jj]:
+                    pygame.draw.rect(screen, (0, 128, 0), [ii * 90, jj * 90, 90, 90])
+                else:
+                    pygame.draw.rect(screen, (128, 0, 0), [ii * 90, jj * 90, 90, 90])
             if drawn_board[ii, jj] > 0:
                 screen.blit(text_surfaces[drawn_board[ii, jj] - 1], (ii * 90 + 30, jj * 90 + 15))
             elif hint_board[ii, jj]:
