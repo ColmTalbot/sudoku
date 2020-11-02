@@ -199,7 +199,12 @@ def draw_numbers():
                         screen, (128, 0, 0),
                         [ii * SQUARESIZE, jj * SQUARESIZE, SQUARESIZE, SQUARESIZE]
                     )
-            if drawn_board[ii, jj] > 0:
+            if initial_board[ii, jj] > 0:
+                screen.blit(
+                    blue_text_surfaces[drawn_board[ii, jj] - 1],
+                    (ii * SQUARESIZE + SQUARESIZE // 3, jj * SQUARESIZE + SQUARESIZE // 6)
+                )
+            elif drawn_board[ii, jj] > 0:
                 screen.blit(
                     text_surfaces[drawn_board[ii, jj] - 1],
                     (ii * SQUARESIZE + SQUARESIZE // 3, jj * SQUARESIZE + SQUARESIZE // 6)
@@ -293,6 +298,9 @@ if __name__ == "__main__":
     text_surfaces = [
         font.render(f"{ii:x}", True, 1) for ii in range(1, BASE ** 2 + 1)
     ]
+    blue_text_surfaces = [
+        font.render(f"{ii:x}", True, (0, 0, 255)) for ii in range(1, BASE ** 2 + 1)
+    ]
     small_text_surfaces = [
         small_font.render(f"{ii:x}", True, 1) for ii in range(1, BASE ** 2 + 1)
     ]
@@ -322,6 +330,9 @@ if __name__ == "__main__":
                     shift = ~shift
                 elif event.key == pygame.K_r:
                     drawn_board[x_pos, y_pos] = solution[x_pos, y_pos]
+                    for squares in drawn_board.friends(x_pos, y_pos):
+                        for square in squares:
+                            allowed_board[square[0], square[1], solution[x_pos, y_pos] - 1] = False
                 elif event.key == pygame.K_n:
                     initial_board, solution, drawn_board, allowed_board, hint_board = reset(base=BASE)
                 elif event.key == pygame.K_x and shift:
@@ -342,8 +353,9 @@ if __name__ == "__main__":
                         allowed_board[x_pos, y_pos, event.key - 49] = ~allowed_board[x_pos, y_pos, event.key - 49]
                     else:
                         drawn_board[x_pos, y_pos] = event.key - 48
-                        allowed_board[x_pos, :, event.key - 49] = False
-                        allowed_board[:, y_pos, event.key - 49] = False
+                        for squares in drawn_board.friends(x_pos, y_pos):
+                            for square in squares:
+                                allowed_board[square[0], square[1], event.key - 49] = False
                 draw_game()
             elif event.type == pygame.KEYUP:
                 if event.key in [pygame.K_LSHIFT, pygame.K_RSHIFT]:
