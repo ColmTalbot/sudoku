@@ -236,34 +236,12 @@ def reset(base=3):
 
 def new_board(base=3, empty_fraction=0.75):
     """
-    Adapted from https://stackoverflow.com/a/56581709
-
-    The algorithm for base is:
-    - start from a base solution
-    - permute the rows and columns inside each sub-grid
-    - permute the row/column ordering of the sub-grids
-    - permute the labels
-    - remove some fraction of the labels
-
-    Parameters
-    ----------
-    base: int
-        The size width/height of a sub-grid.
-        The total width/height=base^2.
-    empty_fraction: float
-        The fraction of squares to leave empty at the beginning.
     """
     side = base * base
+    solution = False
+    while not np.any(solution):
+        solution = new_base()
 
-    def pattern(row, column):
-        return int(base * (row % base) + row // base + column) % side
-
-    rows = [grid * base + row for grid in np.random.permutation(base) for row in np.random.permutation(base)]
-    cols = [grid * base + column for grid in np.random.permutation(base) for column in np.random.permutation(base)]
-    # numbers = np.arange(side) + 1
-    numbers = np.random.permutation(side) + 1
-
-    solution = np.array([[numbers[pattern(r, c)] for c in cols] for r in rows], dtype=int)
     board = solution.copy()
 
     number_of_squares = side * side
@@ -272,6 +250,100 @@ def new_board(base=3, empty_fraction=0.75):
         board[index // side, index % side] = 0
 
     return board, solution
+
+
+def new_base():
+    """
+    Start from centre square and attempt to randomly assign values outside
+
+    TODO:
+    - allow different grid sizes
+    - fix upper right/lower left to not require recursion
+    """
+
+    def _allowed(ii, x_min, x_max, x_offset, y_min, y_max, y_offset):
+        return np.setxor1d(numbers, np.concatenate([total[x_min:x_max, y_offset + ii % 3], total[x_offset + ii // 3, y_min:y_max], new.flatten()[:ii]]))
+
+    def recursively_find(array, ii, func, x_min, x_max, x_offset, y_min, y_max, y_offset):
+        if np.all(array > 0):
+            return array
+        allowed = func(ii, x_min, x_max, x_offset, y_min, y_max, y_offset)
+        if len(allowed) == 0:
+            return False
+        np.random.shuffle(allowed)
+        for num in allowed:
+            array[ii // 3, ii % 3] = num
+            solution = recursively_find(array, ii + 1, func, x_min, x_max, x_offset, y_min, y_max, y_offset)
+            if isinstance(solution, np.ndarray):
+                return solution
+            elif not solution:
+                continue
+            else:
+                if np.all(array > 0):
+                    return array
+        return False
+
+    numbers = np.arange(1, 10)
+
+    # centre
+    total = np.zeros((9, 9), dtype=int)
+    total[3:6, 3:6] = np.random.permutation(numbers).reshape((3, 3))
+    new = np.zeros((3, 3), dtype=int)
+
+    # centre left
+    new[0] = np.random.choice(np.setxor1d(numbers, total[3, 3:6]), 3, replace=False)
+    required = np.intersect1d(np.setxor1d(numbers, np.concatenate([new[0], total[4, 3:6]])), total[5, 3:6])
+    new[1] = np.random.permutation(np.concatenate([required, np.random.choice(total[3, 3:6], 3 - len(required), replace=False)]))
+    new[2] = np.random.permutation(np.setxor1d(numbers, new[:2].flatten()))
+    total[3:6, 0:3] = new
+
+    # upper centre
+    new = np.zeros((3, 3), dtype=int)
+    new[:, 0] = np.random.choice(np.setxor1d(numbers, total[3:6, 3]), 3, replace=False)
+    required = np.intersect1d(np.setxor1d(numbers, np.concatenate([new[:, 0], total[3:6, 4]])), total[3:6, 5])
+    new[:, 1] = np.random.permutation(np.concatenate([required, np.random.choice(total[3:6, 3], 3 - len(required), replace=False)]))
+    new[:, 2] = np.random.permutation(np.setxor1d(numbers, new[:, :2].flatten()))
+    total[0:3, 3:6] = new
+
+    new = np.zeros((3, 3), dtype=int)
+    new = recursively_find(array=new, ii=0, func=_allowed, x_min=3, x_max=6, x_offset=0, y_min=3, y_max=6, y_offset=0)
+    if not np.all(new > 0):
+        return False
+    total[:3, :3] = new
+
+    new = np.zeros((3, 3), dtype=int)
+    new = recursively_find(array=new, ii=0, func=_allowed, x_min=0, x_max=6, x_offset=0, y_min=0, y_max=0, y_offset=0)
+    if not np.all(new > 0):
+        return False
+    total[6:9, :3] = new
+
+    new = np.zeros((3, 3), dtype=int)
+    new = recursively_find(array=new, ii=0, func=_allowed, x_min=0, x_max=0, x_offset=0, y_min=0, y_max=6, y_offset=0)
+    if not np.all(new > 0):
+        return False
+    total[:3, 6:9] = new
+
+    new = np.zeros((3, 3), dtype=int)
+    new = recursively_find(array=new, ii=0, func=_allowed, x_min=0, x_max=3, x_offset=3, y_min=0, y_max=6, y_offset=6)
+    if not np.all(new > 0):
+        return False
+    total[3:6, 6:9] = new
+
+    new = np.zeros((3, 3), dtype=int)
+    new = recursively_find(array=new, ii=0, func=_allowed, x_min=0, x_max=6, x_offset=6, y_min=0, y_max=3, y_offset=3)
+    if not np.all(new > 0):
+        return False
+    total[6:9, 3:6] = new
+
+    new = np.zeros((3, 3), dtype=int)
+    new = recursively_find(array=new, ii=0, func=_allowed, x_min=0, x_max=6, x_offset=6, y_min=0, y_max=6, y_offset=6)
+    if not np.all(new > 0):
+        return False
+    total[6:9, 6:9] = new
+
+    assert len(np.unique(total.flatten())) == 9
+
+    return total
 
 
 if __name__ == "__main__":
